@@ -30,6 +30,9 @@ class WandbCarbs:
 
         self._carbs = carbs
         self._carbs._set_seed(hash(self._sweep_id) % (2**32))
+        self._num_observations = 0
+        self._num_failures = 0
+        self._num_pending = 0
 
         assert self._wandb_run.summary.get("carbs.state") is None, \
             f"Run {self._wandb_run.name} already has carbs state"
@@ -103,15 +106,23 @@ class WandbCarbs:
         )
         for run in runs:
             self._process_run(run)
+        logger.info(f"Loaded {self._num_observations} observations, {self._num_failures} failures, {self._num_pending} pending")
 
     def _process_run(self, run):
         if run.summary["carbs.state"] == "running":
+            self._num_pending += 1
             suggestion = self._carbs.suggest().suggestion
             logger.debug(f"Suggestion: {json.dumps(suggestion, indent=2)}")
         else:
             suggestion = self._suggestion_from_run(run)
             objective = run.summary.get("carbs.objective", 0)
             cost = run.summary.get("carbs.cost", 0)
+
+            if run.summary["carbs.state"] == "failure":
+                self._num_failures += 1
+            else:
+                self._num_observations += 1
+
             self._carbs.observe(
                 ObservationInParam(
                     input=suggestion,
