@@ -1,0 +1,27 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "wandb_carbs"
+version = "0.0.2"
+description = "Integrates Imbue's Cost Aware pareto-Region Bayesian Search (CARBS) with Weights and Biases (WanDB)"
+authors = ["David Bloomin <daveey@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://daveey.github.io"
+repository = "https://github.com/Metta-AI/wandb_carbs"
+keywords = ["bayesian-optimization", "bayesian-search", "cost-aware", "pareto-region", "carbs", "wandb", "weights-and-biases"]
+include = [
+    "**/*.py",
+    "LICENSE",
+    "README.md"
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+carbs = ">=0.0.1"
+wandb = ">=0.16"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.4"
