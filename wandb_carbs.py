@@ -17,6 +17,13 @@ logger = logging.getLogger("wandb_carbs")
 
 class WandbCarbs:
     def __init__(self, carbs: CARBS, wandb_run = None):
+        """
+        Initialize WandbCarbs with a CARBS instance and optionally a wandb run.
+
+        Args:
+            carbs (CARBS): The CARBS instance to use for suggestions.
+            wandb_run (wandb.Run, optional): The wandb run to use. If None, uses the current run.
+        """
         self._wandb_run = wandb_run or wandb.run
         self._sweep_id = self._wandb_run.sweep_id
         self._api = wandb.Api()
@@ -30,9 +37,19 @@ class WandbCarbs:
         self._wandb_run.summary.update({"carbs.state": "running"})
         self._load_runs()
         self._suggestion = self._carbs.suggest().suggestion
-        logger.debug(f"Making suggestion for {self._wandb_run.name}: {json.dumps(self._suggestion, indent=2)}")
+        logger.info(f"Making suggestion for {self._wandb_run.name}: {json.dumps(self._suggestion, indent=2)}")
+        self._wandb_run.config.__dict__["_locked"] = {}
+        self._wandb_run.config.update(self._suggestion, allow_val_change=True)
 
     def record_observation(self, objective: float, cost: float, allow_update: bool = False):
+        """
+        Record an observation for the current run.
+
+        Args:
+            objective (float): The objective value to record.
+            cost (float): The cost value to record.
+            allow_update (bool, optional): If True, allows updating even if the run is not in "running" state.
+        """
         if not allow_update:
             assert self._wandb_run.summary["carbs.state"] == "running", \
                 f"Run is not running, cannot record observation {self._wandb_run.summary}"
@@ -45,11 +62,33 @@ class WandbCarbs:
         logger.info(f"Recording observation ({objective}, {cost}) for {self._wandb_run.name}")
 
     def record_failure(self):
+        """
+        Record a failure for the current run.
+        """
         logger.info(f"Recording failure for {self._wandb_run.name}")
         self._wandb_run.summary.update({"carbs.state": "failure"})
 
+
     def suggest(self):
+        """
+        Get the current suggestion.
+
+        Returns:
+            dict: The current suggestion.
+        """
         return self._suggestion
+
+    def rewrite_carbs_suggestion(self, suggestion):
+        """
+        Rewrite the CARBS suggestion before it is applied to the config.
+
+        Args:
+            suggestion (dict): The original suggestion from CARBS.
+
+        Returns:
+            dict: The rewritten suggestion.
+        """
+        return suggestion
 
     def _load_runs(self):
         logger.info(f"Loading previous runs from sweep {self._sweep_id}")
@@ -94,15 +133,27 @@ class WandbCarbs:
             for param in self._carbs.params
         }
 
-def create_sweep(sweep_name: str, wandb_entity: str, wandb_project: str, carbs_spaces):
+def create_sweep(sweep_name: str, wandb_entity: str, wandb_project: str, carb_params: List[Param]):
+    """
+    Create a new wandb sweep based on CARBS parameters.
+
+    Args:
+        sweep_name (str): The name of the sweep.
+        wandb_entity (str): The wandb entity (username or team name).
+        wandb_project (str): The wandb project name.
+        carb_params (List[Param]): The CARBS parameter spaces.
+
+    Returns:
+        str: The ID of the created sweep.
+    """
     sweep_id = wandb.sweep(
-        sweep=_wandb_sweep_cfg_from_carbs_params(sweep_name, carbs_spaces),
+        sweep=_wandb_sweep_cfg_from_carbs_params(sweep_name, carb_params),
         project=wandb_project,
         entity=wandb_entity,
     )
     return sweep_id
 
-def _wandb_sweep_cfg_from_carbs_params(name, carbs_params: List[Param]):
+def _wandb_sweep_cfg_from_carbs_params(name, carb_params: List[Param]):
     wandb_sweep_cfg = {
         "method": "bayes",
         "metric": {
@@ -112,7 +163,7 @@ def _wandb_sweep_cfg_from_carbs_params(name, carbs_params: List[Param]):
         "parameters": {},
         "name": name,
     }
-    for param in carbs_params:
+    for param in carb_params:
         wandb_sweep_cfg["parameters"][param.name] = {
             "min": param.space.min,
             "max": param.space.max,
