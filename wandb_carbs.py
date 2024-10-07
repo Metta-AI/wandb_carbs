@@ -8,9 +8,10 @@ from carbs import (
     LogSpace,
     LogitSpace,
     LinearSpace,
+    SuggestionInBasic,
 )
 from typing import List
-
+from copy import deepcopy
 
 logger = logging.getLogger("wandb_carbs")
 # logger.setLevel(logging.DEBUG)
@@ -32,7 +33,6 @@ class WandbCarbs:
         self._carbs._set_seed(hash(self._sweep_id) % (2**32))
         self._num_observations = 0
         self._num_failures = 0
-        self._num_pending = 0
 
         assert self._wandb_run.summary.get("carbs.state") is None, \
             f"Run {self._wandb_run.name} already has carbs state"
@@ -40,9 +40,8 @@ class WandbCarbs:
         self._wandb_run.summary.update({"carbs.state": "running"})
         self._load_runs()
         self._suggestion = self._carbs.suggest().suggestion
-        logger.info(f"Making suggestion for {self._wandb_run.name}: {json.dumps(self._suggestion, indent=2)}")
         self._wandb_run.config.__dict__["_locked"] = {}
-        self._wandb_run.config.update(self._suggestion, allow_val_change=True)
+        self._wandb_run.config.update(self.suggest(), allow_val_change=True)
 
     def record_observation(self, objective: float, cost: float, allow_update: bool = False):
         """
@@ -79,19 +78,7 @@ class WandbCarbs:
         Returns:
             dict: The current suggestion.
         """
-        return self._suggestion
-
-    def rewrite_carbs_suggestion(self, suggestion):
-        """
-        Rewrite the CARBS suggestion before it is applied to the config.
-
-        Args:
-            suggestion (dict): The original suggestion from CARBS.
-
-        Returns:
-            dict: The rewritten suggestion.
-        """
-        return suggestion
+        return deepcopy(self._suggestion)
 
     def _load_runs(self):
         logger.info(f"Loading previous runs from sweep {self._sweep_id}")
@@ -104,39 +91,36 @@ class WandbCarbs:
             },
             order="+created_at"
         )
-        for run in runs:
-            self._process_run(run)
-        logger.info(f"Loaded {self._num_observations} observations, {self._num_failures} failures, {self._num_pending} pending")
+        observations = [
+            self._observation_from_run(r)
+            for r in runs if r.summary["carbs.state"] != "running"]
+        self._carbs.initialize_from_observations(observations)
+        logger.info(f"Initialized CARBS with {len(observations)} observations" +
+                    f" and {self._num_failures} failures")
 
-    def _process_run(self, run):
-        if run.summary["carbs.state"] == "running":
-            self._num_pending += 1
-            suggestion = self._carbs.suggest().suggestion
-            logger.debug(f"Suggestion: {json.dumps(suggestion, indent=2)}")
+    def _observation_from_run(self, run):
+        suggestion = self._suggestion_from_run(run)
+        objective = run.summary.get("carbs.objective", 0)
+        cost = run.summary.get("carbs.cost", 0)
+
+        if run.summary["carbs.state"] == "failure":
+            self._num_failures += 1
         else:
-            suggestion = self._suggestion_from_run(run)
-            objective = run.summary.get("carbs.objective", 0)
-            cost = run.summary.get("carbs.cost", 0)
+            self._num_observations += 1
 
-            if run.summary["carbs.state"] == "failure":
-                self._num_failures += 1
-            else:
-                self._num_observations += 1
+        logger.debug(
+            f"Observation {run.name} " +
+            f"{objective} / {cost} " +
+            f"failure: {run.summary['carbs.state'] == 'failure'} " +
+            json.dumps(suggestion, indent=2)
+        )
+        return ObservationInParam(
+            input=suggestion,
+            output=objective,
+            cost=cost,
+            is_failure=run.summary["carbs.state"] == "failure"
+        )
 
-            self._carbs.observe(
-                ObservationInParam(
-                    input=suggestion,
-                    output=objective,
-                    cost=cost,
-                    is_failure=run.summary["carbs.state"] == "failure"
-                )
-            )
-            logger.debug(
-                f"Observation {run.name} " +
-                f"{objective} / {cost} " +
-                f"failure: {run.summary['carbs.state'] == 'failure'} " +
-                json.dumps(suggestion, indent=2)
-            )
 
     def _suggestion_from_run(self, run):
         return {
