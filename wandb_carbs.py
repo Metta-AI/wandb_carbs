@@ -40,7 +40,7 @@ class WandbCarbs:
         assert self._wandb_run.summary.get("carbs.state") is None, \
             f"Run {self._wandb_run.name} already has carbs state"
 
-        self._wandb_run.summary.update({"carbs.state": "running"})
+        self._wandb_run.summary.update({"carbs.state": "initializing"})
         self._load_runs()
         self._suggestion = self._carbs.suggest().suggestion
 
@@ -48,6 +48,7 @@ class WandbCarbs:
         del wandb_config["suggestion_uuid"]
         self._wandb_run.config.__dict__["_locked"] = {}
         self._wandb_run.config.update(wandb_config, allow_val_change=True)
+        self._wandb_run.summary.update({"carbs.state": "running"})
 
     def record_observation(self, objective: float, cost: float, allow_update: bool = False):
         """
@@ -108,6 +109,9 @@ class WandbCarbs:
                     f" and {self._num_failures} failures")
 
     def _update_carbs_from_run(self, run):
+        if run.summary["carbs.state"] == "initializing":
+            return
+
         suggestion = self._suggestion_from_run(run)
         self._carbs._remember_suggestion(
             suggestion,
