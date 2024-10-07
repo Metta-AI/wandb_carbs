@@ -1,17 +1,18 @@
-import wandb
-from carbs import CARBS
-import logging
 import json
+import logging
+import math
+from copy import deepcopy
+from typing import List, Set
+
+import wandb
 from carbs import (
+    CARBS,
+    LinearSpace,
+    LogitSpace,
+    LogSpace,
     ObservationInParam,
     Param,
-    LogSpace,
-    LogitSpace,
-    LinearSpace,
-    SuggestionInBasic,
 )
-from typing import List
-from copy import deepcopy
 
 logger = logging.getLogger("wandb_carbs")
 # logger.setLevel(logging.DEBUG)
@@ -127,6 +128,46 @@ class WandbCarbs:
             param.name: run.config.get(param.name, param.search_center)
             for param in self._carbs.params
         }
+
+
+
+class Pow2WandbCarbs(WandbCarbs):
+    """
+    A subclass of WandbCarbs that handles parameters that should be treated as powers of 2.
+
+    This class extends WandbCarbs to support parameters that are internally represented as
+    exponents but should be presented as powers of 2 externally.
+
+    Attributes:
+        pow2_params (Set[str]): A set of parameter names that should be treated as powers of 2.
+
+    """
+
+    def __init__(self, carbs: CARBS, pow2_params: Set[str], wandb_run = None):
+        """
+        Initialize the Pow2WandbCarbs instance.
+
+        Args:
+            carbs (CARBS): The CARBS instance to use for optimization.
+            pow2_params (Set[str]): A set of parameter names to be treated as powers of 2.
+            wandb_run: The Weights & Biases run object (optional).
+        """
+        self.pow2_params = pow2_params or set()
+        super().__init__(carbs, wandb_run)
+
+    def suggest(self):
+        suggestion = super().suggest()
+        for param in self._carbs.params:
+            if param.name in self.pow2_params:
+                suggestion[param.name] = 2 ** suggestion[param.name]
+        return suggestion
+
+    def _suggestion_from_run(self, run):
+        suggestion = super()._suggestion_from_run(run)
+        for param in self._carbs.params:
+            if param.name in self.pow2_params:
+                suggestion[param.name] = int(math.log2(suggestion[param.name]))
+        return suggestion
 
 def create_sweep(sweep_name: str, wandb_entity: str, wandb_project: str, carb_params: List[Param]):
     """

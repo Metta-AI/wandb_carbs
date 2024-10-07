@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "wandb_carbs"
-version = "0.0.4"
+version = "0.0.5"
 description = "Integrates Imbue's Cost Aware pareto-Region Bayesian Search (CARBS) with Weights and Biases (WanDB)"
 authors = ["David Bloomin <daveey@gmail.com>"]
 license = "MIT"
