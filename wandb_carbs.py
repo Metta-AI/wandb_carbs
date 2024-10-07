@@ -44,7 +44,7 @@ class WandbCarbs:
         self._load_runs()
         self._suggestion = self._carbs.suggest().suggestion
 
-        wandb_config = self.suggest()
+        wandb_config = self._transform_suggestion(deepcopy(self._suggestion))
         del wandb_config["suggestion_uuid"]
         self._wandb_run.config.__dict__["_locked"] = {}
         self._wandb_run.config.update(wandb_config, allow_val_change=True)
@@ -84,7 +84,10 @@ class WandbCarbs:
         Returns:
             dict: The current suggestion.
         """
-        return deepcopy(self._suggestion)
+        return self._transform_suggestion(deepcopy(self._suggestion))
+
+    def _transform_suggestion(self, suggestion):
+        return suggestion
 
     def _load_runs(self):
         logger.info(f"Loading previous runs from sweep {self._sweep_id}")
@@ -168,8 +171,7 @@ class Pow2WandbCarbs(WandbCarbs):
         self.pow2_params = pow2_params or set()
         super().__init__(carbs, wandb_run)
 
-    def suggest(self):
-        suggestion = super().suggest()
+    def _transform_suggestion(self, suggestion):
         for param in self._carbs.params:
             if param.name in self.pow2_params:
                 suggestion[param.name] = 2 ** suggestion[param.name]
