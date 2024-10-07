@@ -43,7 +43,9 @@ class WandbCarbs:
         self._load_runs()
         self._suggestion = self._carbs.suggest().suggestion
         self._wandb_run.config.__dict__["_locked"] = {}
-        self._wandb_run.config.update(self.suggest(), allow_val_change=True)
+        wandb_config = self.suggest()
+        del wandb_config["suggestion_uuid"]
+        self._wandb_run.config.update(wandb_config, allow_val_change=True)
 
     def record_observation(self, objective: float, cost: float, allow_update: bool = False):
         """
