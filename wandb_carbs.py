@@ -1,6 +1,7 @@
 import json
 import logging
 import math
+import time
 from copy import deepcopy
 from typing import List, Set
 
@@ -31,7 +32,7 @@ class WandbCarbs:
         self._api = wandb.Api()
 
         self._carbs = carbs
-        self._carbs._set_seed(hash(self._sweep_id) % (2**32))
+        self._carbs._set_seed(int(time.time()))
         self._num_observations = 0
         self._num_failures = 0
 
