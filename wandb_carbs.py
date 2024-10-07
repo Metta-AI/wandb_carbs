@@ -12,6 +12,7 @@ from carbs import (
     LogitSpace,
     LogSpace,
     ObservationInParam,
+    SuggestionInBasic,
     Param,
 )
 
@@ -42,9 +43,10 @@ class WandbCarbs:
         self._wandb_run.summary.update({"carbs.state": "running"})
         self._load_runs()
         self._suggestion = self._carbs.suggest().suggestion
-        self._wandb_run.config.__dict__["_locked"] = {}
+
         wandb_config = self.suggest()
         del wandb_config["suggestion_uuid"]
+        self._wandb_run.config.__dict__["_locked"] = {}
         self._wandb_run.config.update(wandb_config, allow_val_change=True)
 
     def record_observation(self, objective: float, cost: float, allow_update: bool = False):
@@ -95,15 +97,21 @@ class WandbCarbs:
             },
             order="+created_at"
         )
-        observations = [
-            self._observation_from_run(r)
-            for r in runs if r.summary["carbs.state"] != "running"]
-        self._carbs.initialize_from_observations(observations)
-        logger.info(f"Initialized CARBS with {len(observations)} observations" +
+
+        for run in runs:
+            self._update_carbs_from_run(run)
+
+        logger.info(f"Initialized CARBS with {self._num_observations} observations" +
                     f" and {self._num_failures} failures")
 
-    def _observation_from_run(self, run):
+    def _update_carbs_from_run(self, run):
         suggestion = self._suggestion_from_run(run)
+        self._carbs._remember_suggestion(
+            suggestion,
+            SuggestionInBasic(self._carbs._param_space_real_to_basic_space_real(suggestion)),
+            run.id
+        )
+
         objective = run.summary.get("carbs.objective", 0)
         cost = run.summary.get("carbs.cost", 0)
 
@@ -118,19 +126,21 @@ class WandbCarbs:
             f"failure: {run.summary['carbs.state'] == 'failure'} " +
             json.dumps(suggestion, indent=2)
         )
-        return ObservationInParam(
+        self._carbs.observe(ObservationInParam(
             input=suggestion,
             output=objective,
             cost=cost,
             is_failure=run.summary["carbs.state"] == "failure"
-        )
+        ))
 
 
     def _suggestion_from_run(self, run):
-        return {
+        suggestion = {
             param.name: run.config.get(param.name, param.search_center)
             for param in self._carbs.params
         }
+        suggestion["suggestion_uuid"] = run.id
+        return suggestion
 
 
 
