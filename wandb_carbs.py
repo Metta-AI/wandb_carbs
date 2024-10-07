@@ -119,6 +119,9 @@ class WandbCarbs:
             run.id
         )
 
+        if run.summary["carbs.state"] == "running":
+            return
+
         objective = run.summary.get("carbs.objective", 0)
         cost = run.summary.get("carbs.cost", 0)
 
