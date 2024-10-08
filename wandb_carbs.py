@@ -1,12 +1,12 @@
 import json
 import logging
 import math
-import time
-from copy import deepcopy
-from typing import List, Set
-
 import random
+import time
 import traceback
+from copy import deepcopy
+from datetime import datetime, timezone
+from typing import List, Set
 
 import wandb
 from carbs import (
@@ -15,8 +15,8 @@ from carbs import (
     LogitSpace,
     LogSpace,
     ObservationInParam,
-    SuggestionInBasic,
     Param,
+    SuggestionInBasic,
 )
 
 logger = logging.getLogger("wandb_carbs")
@@ -45,21 +45,7 @@ class WandbCarbs:
 
         self._wandb_run.summary.update({"carbs.state": "initializing"})
         self._load_runs()
-
-        for _ in range(10):
-            try:
-                self._suggestion = self._carbs.suggest().suggestion
-                break
-            except Exception as e:
-                logger.warning(f"Failed to suggest: {e}")
-                traceback.print_exc()
-                # Remove a random element from successful observations if any exist
-                if len(self._carbs.success_observations):
-                    self._carbs.success_observations.pop(
-                        random.randint(0, len(self._carbs.success_observations) - 1))
-                if len(self._carbs.failure_observations):
-                    self._carbs.failure_observations.pop(
-                        random.randint(0, len(self._carbs.failure_observations) - 1))
+        self._generate_carbs_suggestion()
 
         wandb_config = self._transform_suggestion(deepcopy(self._suggestion))
         del wandb_config["suggestion_uuid"]
@@ -129,6 +115,13 @@ class WandbCarbs:
         if run.summary["carbs.state"] == "initializing":
             return
 
+        if run.summary["carbs.state"] == "running":
+            last_hb = datetime.strptime(
+                run._attrs["heartbeatAt"], "%Y-%m-%dT%H:%M:%S%fZ").replace(tzinfo=timezone.utc)
+            if (datetime.now(timezone.utc) - last_hb).total_seconds() > 5*60:
+                logger.debug(f"skipping run {run.name} because it has not heartbeated in the last 5 minutes")
+                return
+
         suggestion = self._suggestion_from_run(run)
         self._carbs._remember_suggestion(
             suggestion,
@@ -137,6 +130,7 @@ class WandbCarbs:
         )
 
         if run.summary["carbs.state"] == "running":
+            logger.debug(f"recording suggestion run {run.name} that is still running")
             return
 
         objective = run.summary.get("carbs.objective", 0)
@@ -169,6 +163,28 @@ class WandbCarbs:
         suggestion["suggestion_uuid"] = run.id
         return suggestion
 
+    def _generate_carbs_suggestion(self):
+        while True:
+            try:
+                self._suggestion = self._carbs.suggest().suggestion
+                break
+            except Exception as e:
+                logger.warning(f"Failed to suggest: {e}")
+                traceback.print_exc()
+
+                if len(self._carbs.success_observations) == 0 and len(self._carbs.failure_observations) == 0:
+                    logger.error("Unable to recover from failed suggestion, no observations to remove")
+                    raise e
+
+                # Remove a random element from success and failure observations
+                if len(self._carbs.success_observations):
+                    logger.info("Removing random success observation")
+                    self._carbs.success_observations.pop(
+                        random.randint(0, len(self._carbs.success_observations) - 1))
+                elif len(self._carbs.failure_observations):
+                    logger.info("Removing random failure observation")
+                    self._carbs.failure_observations.pop(
+                        random.randint(0, len(self._carbs.failure_observations) - 1))
 
 
 class Pow2WandbCarbs(WandbCarbs):
