@@ -178,7 +178,7 @@ class WandbCarbs:
                 break
             except Exception as e:
                 logger.warning(f"Failed to suggest: {e}")
-                traceback.print_exc()
+                logger.debug(traceback.format_exc())
 
                 if len(self._carbs.success_observations) == 0 and len(self._carbs.failure_observations) == 0:
                     logger.error("Unable to recover from failed suggestion, no observations to remove")
