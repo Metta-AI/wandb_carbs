@@ -5,6 +5,9 @@ import time
 from copy import deepcopy
 from typing import List, Set
 
+import random
+import traceback
+
 import wandb
 from carbs import (
     CARBS,
@@ -42,7 +45,21 @@ class WandbCarbs:
 
         self._wandb_run.summary.update({"carbs.state": "initializing"})
         self._load_runs()
-        self._suggestion = self._carbs.suggest().suggestion
+
+        for _ in range(10):
+            try:
+                self._suggestion = self._carbs.suggest().suggestion
+                break
+            except Exception as e:
+                logger.warning(f"Failed to suggest: {e}")
+                traceback.print_exc()
+                # Remove a random element from successful observations if any exist
+                if len(self._carbs.success_observations):
+                    self._carbs.success_observations.pop(
+                        random.randint(0, len(self._carbs.success_observations) - 1))
+                if len(self._carbs.failure_observations):
+                    self._carbs.failure_observations.pop(
+                        random.randint(0, len(self._carbs.failure_observations) - 1))
 
         wandb_config = self._transform_suggestion(deepcopy(self._suggestion))
         del wandb_config["suggestion_uuid"]
