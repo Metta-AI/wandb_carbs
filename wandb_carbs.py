@@ -39,6 +39,8 @@ class WandbCarbs:
         self._carbs._set_seed(int(time.time()))
         self._num_observations = 0
         self._num_failures = 0
+        self._num_running = 0
+        self._defunct = 0
 
         assert self._wandb_run.summary.get("carbs.state") is None, \
             f"Run {self._wandb_run.name} already has carbs state"
@@ -108,8 +110,12 @@ class WandbCarbs:
         for run in runs:
             self._update_carbs_from_run(run)
 
-        logger.info(f"Initialized CARBS with {self._num_observations} observations" +
-                    f" and {self._num_failures} failures")
+        logger.info("Initialized CARBS with " + json.dumps({
+            "observations" : self._num_observations,
+            "failures" : self._num_failures,
+            "running" : self._num_running,
+            "defunct" : self._defunct
+        }))
 
     def _update_carbs_from_run(self, run):
         if run.summary["carbs.state"] == "initializing":
@@ -120,6 +126,7 @@ class WandbCarbs:
                 run._attrs["heartbeatAt"], "%Y-%m-%dT%H:%M:%S%fZ").replace(tzinfo=timezone.utc)
             if (datetime.now(timezone.utc) - last_hb).total_seconds() > 5*60:
                 logger.debug(f"skipping run {run.name} because it has not heartbeated in the last 5 minutes")
+                self._defunct += 1
                 return
 
         suggestion = self._suggestion_from_run(run)
@@ -131,6 +138,7 @@ class WandbCarbs:
 
         if run.summary["carbs.state"] == "running":
             logger.debug(f"recording suggestion run {run.name} that is still running")
+            self._num_running += 1
             return
 
         objective = run.summary.get("carbs.objective", 0)
