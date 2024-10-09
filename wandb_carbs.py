@@ -97,6 +97,18 @@ class WandbCarbs:
 
     def _load_runs(self):
         logger.info(f"Loading previous runs from sweep {self._sweep_id}")
+
+        for run in self._get_runs_from_wandb():
+            self._update_carbs_from_run(run)
+
+        logger.info("Initialized CARBS with " + json.dumps({
+            "observations" : self._num_observations,
+            "failures" : self._num_failures,
+            "running" : self._num_running,
+            "defunct" : self._defunct
+        }))
+
+    def _get_runs_from_wandb(self):
         runs = self._api.runs(
             path=f"{self._wandb_run.entity}/{self._wandb_run.project}",
             filters={
@@ -106,16 +118,7 @@ class WandbCarbs:
             },
             order="+created_at"
         )
-
-        for run in runs:
-            self._update_carbs_from_run(run)
-
-        logger.info("Initialized CARBS with " + json.dumps({
-            "observations" : self._num_observations,
-            "failures" : self._num_failures,
-            "running" : self._num_running,
-            "defunct" : self._defunct
-        }))
+        return runs
 
     def _update_carbs_from_run(self, run):
         if run.summary["carbs.state"] == "initializing":
