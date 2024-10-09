@@ -257,7 +257,7 @@ def _wandb_sweep_cfg_from_carbs_params(name, carb_params: List[Param]):
         "method": "bayes",
         "metric": {
             "goal": "maximize",
-            "name": "eval_metric",
+            "name": "carbs.objective",
         },
         "parameters": {},
         "name": name,
