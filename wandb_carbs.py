@@ -40,7 +40,6 @@ class WandbCarbs:
         self._num_observations = 0
         self._num_failures = 0
         self._num_running = 0
-        self._num_initializing = 0
         self._defunct = 0
         self._observations = []
 
@@ -106,7 +105,6 @@ class WandbCarbs:
         logger.info("Initialized CARBS with " + json.dumps({
             "observations" : self._num_observations,
             "failures" : self._num_failures,
-            "initializing" : self._num_initializing,
             "running" : self._num_running,
             "defunct" : self._defunct
         }))
@@ -124,11 +122,7 @@ class WandbCarbs:
         return runs
 
     def _update_carbs_from_run(self, run):
-        if run.summary["carbs.state"] == "initializing":
-            self._num_initializing += 1
-            return
-
-        if run.summary["carbs.state"] == "running":
+        if run.summary["carbs.state"] == "initializing" or run.summary["carbs.state"] == "running":
             last_hb = datetime.strptime(
                 run._attrs["heartbeatAt"], "%Y-%m-%dT%H:%M:%S%fZ").replace(tzinfo=timezone.utc)
             if (datetime.now(timezone.utc) - last_hb).total_seconds() > 5*60:
