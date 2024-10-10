@@ -164,7 +164,8 @@ class WandbCarbs:
             "objective": objective,
             "cost": cost,
             "is_failure": run.summary["carbs.state"] == "failure",
-            "run_id": run.id
+            "run_id": run.id,
+            "run_name": run.name
         })
         self._carbs.observe(ObservationInParam(
             input=suggestion,
