@@ -41,6 +41,7 @@ class WandbCarbs:
         self._num_failures = 0
         self._num_running = 0
         self._defunct = 0
+        self._observations = []
 
         assert self._wandb_run.summary.get("carbs.state") is None, \
             f"Run {self._wandb_run.name} already has carbs state"
@@ -158,6 +159,13 @@ class WandbCarbs:
             f"failure: {run.summary['carbs.state'] == 'failure'} " +
             json.dumps(suggestion, indent=2)
         )
+        self._observations.append({
+            "suggestion": suggestion,
+            "objective": objective,
+            "cost": cost,
+            "is_failure": run.summary["carbs.state"] == "failure",
+            "run_id": run.id
+        })
         self._carbs.observe(ObservationInParam(
             input=suggestion,
             output=objective,
