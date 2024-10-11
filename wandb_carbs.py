@@ -240,9 +240,10 @@ class Pow2WandbCarbs(WandbCarbs):
             if param.name in self.pow2_params:
                 try:
                     suggestion[param.name] = int(math.log2(suggestion[param.name]))
-                except ValueError:
+                except ValueError as e:
                     logger.warning(
                         f"Failed to convert {run.name}:{param.name} to power of 2: {suggestion[param.name]}")
+                    raise e
 
         return suggestion
 
