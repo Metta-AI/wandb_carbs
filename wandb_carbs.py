@@ -238,7 +238,12 @@ class Pow2WandbCarbs(WandbCarbs):
         suggestion = super()._suggestion_from_run(run)
         for param in self._carbs.params:
             if param.name in self.pow2_params:
-                suggestion[param.name] = int(math.log2(suggestion[param.name]))
+                try:
+                    suggestion[param.name] = int(math.log2(suggestion[param.name]))
+                except ValueError:
+                    logger.warning(
+                        f"Failed to convert {run.name}:{param.name} to power of 2: {suggestion[param.name]}")
+
         return suggestion
 
 def create_sweep(sweep_name: str, wandb_entity: str, wandb_project: str, carb_params: List[Param]):
