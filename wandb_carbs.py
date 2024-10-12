@@ -41,6 +41,7 @@ class WandbCarbs:
         self._num_failures = 0
         self._num_running = 0
         self._defunct = 0
+        self._invalid = 0
         self._observations = []
 
         assert self._wandb_run.summary.get("carbs.state") is None, \
@@ -106,7 +107,8 @@ class WandbCarbs:
             "observations" : self._num_observations,
             "failures" : self._num_failures,
             "running" : self._num_running,
-            "defunct" : self._defunct
+            "defunct" : self._defunct,
+            "invalid" : self._invalid
         }))
 
     def _get_runs_from_wandb(self):
@@ -122,7 +124,10 @@ class WandbCarbs:
         return runs
 
     def _update_carbs_from_run(self, run):
-        if run.summary["carbs.state"] in ["initializing", "running"]:
+        if run.summary["carbs.state"] == "initializing":
+            logger.debug(f"skipping run {run.name} because it is initializing")
+
+        if run.summary["carbs.state"] == "running":
             last_hb = datetime.strptime(
                 run._attrs["heartbeatAt"], "%Y-%m-%dT%H:%M:%S%fZ").replace(tzinfo=timezone.utc)
             if (datetime.now(timezone.utc) - last_hb).total_seconds() > 5*60:
@@ -130,7 +135,13 @@ class WandbCarbs:
                 self._defunct += 1
                 return
 
-        suggestion = self._suggestion_from_run(run)
+        try:
+            suggestion = self._suggestion_from_run(run)
+        except Exception as e:
+            logger.warning(f"Failed to get suggestion from run {run.name}: {e}")
+            self._invalid += 1
+            return
+
         self._carbs._remember_suggestion(
             suggestion,
             SuggestionInBasic(self._carbs._param_space_real_to_basic_space_real(suggestion)),
