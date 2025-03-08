@@ -23,7 +23,7 @@ logger = logging.getLogger("wandb_carbs")
 # logger.setLevel(logging.DEBUG)
 
 class WandbCarbs:
-    def __init__(self, carbs: CARBS, wandb_run = None):
+    def __init__(self, carbs: CARBS, wandb_run = None, sweep_id: str = None):
         """
         Initialize WandbCarbs with a CARBS instance and optionally a wandb run.
 
@@ -115,7 +115,7 @@ class WandbCarbs:
         runs = self._api.runs(
             path=f"{self._wandb_run.entity}/{self._wandb_run.project}",
             filters={
-                "sweep": self._sweep_id,
+                "tags": {"$in": [f"sweep_id:{self._sweep_id}"]},
                 "summary_metrics.carbs.state": {"$exists": True},
                 "id": {"$ne": self._wandb_run.id}
             },
