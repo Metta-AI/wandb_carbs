@@ -115,7 +115,8 @@ class WandbCarbs:
         runs = self._api.runs(
             path=f"{self._wandb_run.entity}/{self._wandb_run.project}",
             filters={
-                "tags": {"$in": [f"sweep_id:{self._sweep_id}"]},
+                "sweep": self._sweep_id,
+                # "tags": {"$in": [f"sweep_id:{self._sweep_id}"]},
                 "summary_metrics.carbs.state": {"$exists": True},
                 "id": {"$ne": self._wandb_run.id}
             },
