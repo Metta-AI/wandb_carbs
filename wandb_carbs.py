@@ -58,6 +58,10 @@ class WandbCarbs:
         self._wandb_run.summary.update({"carbs.state": "running"})
 
     def record_observation(self, objective: float, cost: float, allow_update: bool = False):
+        self._record_observation(self._wandb_run, objective, cost, allow_update)
+
+    @staticmethod
+    def _record_observation(wandb_run, objective: float, cost: float, allow_update: bool = False):
         """
         Record an observation for the current run.
 
@@ -67,22 +71,26 @@ class WandbCarbs:
             allow_update (bool, optional): If True, allows updating even if the run is not in "running" state.
         """
         if not allow_update:
-            assert self._wandb_run.summary["carbs.state"] == "running", \
-                f"Run is not running, cannot record observation {self._wandb_run.summary}"
+            assert wandb_run.summary["carbs.state"] == "running", \
+                f"Run is not running, cannot record observation {wandb_run.summary}"
 
-        self._wandb_run.summary.update({
+        wandb_run.summary.update({
             "carbs.objective": objective,
             "carbs.cost": cost,
             "carbs.state": "success"
         })
-        logger.info(f"Recording observation ({objective}, {cost}) for {self._wandb_run.name}")
+        logger.info(f"Recording observation ({objective}, {cost}) for {wandb_run.name}")
 
     def record_failure(self):
+        self._record_failure(self._wandb_run)
+
+    @staticmethod
+    def _record_failure(wandb_run):
         """
         Record a failure for the current run.
         """
-        logger.info(f"Recording failure for {self._wandb_run.name}")
-        self._wandb_run.summary.update({"carbs.state": "failure"})
+        logger.info(f"Recording failure for {wandb_run.name}")
+        wandb_run.summary.update({"carbs.state": "failure"})
 
 
     def suggest(self):
